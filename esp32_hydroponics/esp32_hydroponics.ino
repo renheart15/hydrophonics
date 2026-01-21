@@ -1,6 +1,4 @@
 #include <WiFi.h>
-#include <WebServer.h>
-#include <ESPmDNS.h>
 #include <HTTPClient.h>
 
 // WiFi credentials
@@ -32,7 +30,6 @@ float intercept;
 
 // Variables
 bool pumpStatus = false;
-WebServer server(8080);
 unsigned long lastSensorSend = 0;
 unsigned long lastPumpCheck = 0;
 
@@ -59,28 +56,9 @@ void setup() {
   Serial.println();
   Serial.print("Connected to WiFi. IP: ");
   Serial.println(WiFi.localIP());
-
-  // Setup mDNS
-  if (MDNS.begin("esp32-hydroponics")) {
-    Serial.println("mDNS responder started");
-    MDNS.addService("_http", "_tcp", 8080);
-  } else {
-    Serial.println("Error setting up mDNS responder!");
-  }
-
-  // Setup server routes
-  server.on("/sensor", HTTP_GET, handleSensor);
-  server.on("/sensor", HTTP_OPTIONS, handleOptions);
-  server.on("/pump", HTTP_POST, handlePump);
-  server.on("/pump", HTTP_OPTIONS, handleOptions);
-
-  server.begin();
-  Serial.println("HTTP server started");
 }
 
 void loop() {
-  server.handleClient();
-
   // Send sensor data to server every 3 seconds
   if (millis() - lastSensorSend > 3000) {
     sendSensorData();
@@ -94,46 +72,7 @@ void loop() {
   }
 }
 
-void handleSensor() {
-  float ph = readPH();
-  float waterLevel = readWaterLevel();
-  bool pump = pumpStatus;
 
-  String json = "{";
-  json += "\"ph\":" + String(ph, 2) + ",";
-  json += "\"water_level\":" + String(waterLevel, 0) + ",";
-  json += "\"pump_status\":" + String(pump ? "true" : "false");
-  json += "}";
-
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
-  server.send(200, "application/json", json);
-}
-
-void handlePump() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (server.hasArg("plain")) {
-    String body = server.arg("plain");
-    // Simple JSON parsing (assuming {"pump_status":true/false})
-    bool newStatus = body.indexOf("true") != -1;
-    pumpStatus = newStatus;
-    digitalWrite(PUMP_RELAY_PIN, newStatus ? HIGH : LOW);
-    server.send(200, "application/json", "{\"status\":\"ok\"}");
-  } else {
-    server.send(400, "application/json", "{\"error\":\"Invalid request\"}");
-  }
-}
-
-void handleOptions() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
-  server.send(200, "text/plain", "");
-}
 
 float readPH() {
   int adcValue = analogRead(PH_PIN);
