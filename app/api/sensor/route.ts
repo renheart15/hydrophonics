@@ -10,8 +10,8 @@ let latestSensorData: {
 
 // Alert thresholds
 const ALERT_THRESHOLDS = {
-  ph_low: 5.5,
-  ph_high: 7.5,
+  ph_low: 5.0,
+  ph_high: 8.0,
   water_level_low: 20, // percentage
   water_level_high: 90, // percentage
 };
@@ -61,13 +61,13 @@ async function checkAlerts(ph: number, waterLevel: number) {
   if (ph < ALERT_THRESHOLDS.ph_low) {
     const alertKey = 'ph_low';
     if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
-      alerts.push(`⚠️ ALERT: pH level too low! Current: ${ph.toFixed(2)} (below ${ALERT_THRESHOLDS.ph_low})`);
+      alerts.push(`⚠️ ALERT: pH level too low! Current: ${ph.toFixed(2)} (below ${ALERT_THRESHOLDS.ph_low}). Replace water and fertilizer.`);
       lastAlerts[alertKey] = now;
     }
   } else if (ph > ALERT_THRESHOLDS.ph_high) {
     const alertKey = 'ph_high';
     if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
-      alerts.push(`⚠️ ALERT: pH level too high! Current: ${ph.toFixed(2)} (above ${ALERT_THRESHOLDS.ph_high})`);
+      alerts.push(`⚠️ ALERT: pH level too high! Current: ${ph.toFixed(2)} (above ${ALERT_THRESHOLDS.ph_high}). Replace water and fertilizer.`);
       lastAlerts[alertKey] = now;
     }
   }
@@ -76,13 +76,13 @@ async function checkAlerts(ph: number, waterLevel: number) {
   if (waterLevel < ALERT_THRESHOLDS.water_level_low) {
     const alertKey = 'water_low';
     if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
-      alerts.push(`🚨 ALERT: Water level critically low! Current: ${waterLevel.toFixed(1)}% (below ${ALERT_THRESHOLDS.water_level_low}%)`);
+      alerts.push(`🚨 ALERT: Water level critically low! Current: ${waterLevel.toFixed(1)}% (below ${ALERT_THRESHOLDS.water_level_low}%). Refill water and fertilizer.`);
       lastAlerts[alertKey] = now;
     }
   } else if (waterLevel > ALERT_THRESHOLDS.water_level_high) {
     const alertKey = 'water_high';
     if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
-      alerts.push(`⚠️ ALERT: Water level too high! Current: ${waterLevel.toFixed(1)}% (above ${ALERT_THRESHOLDS.water_level_high}%)`);
+      alerts.push(`⚠️ ALERT: Water level too high! Current: ${waterLevel.toFixed(1)}% (above ${ALERT_THRESHOLDS.water_level_high}%). Check pump operation.`);
       lastAlerts[alertKey] = now;
     }
   }
