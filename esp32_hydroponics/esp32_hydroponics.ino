@@ -75,27 +75,81 @@ void loop() {
 
 
 float readPH() {
-  int adcValue = analogRead(PH_PIN);
-  float voltage = adcValue * (VREF / ADC_RESOLUTION);
-  float phValue = slope * voltage + intercept;
+  // Take multiple readings and average for better accuracy
+  const int numReadings = 10;
+  float sum = 0;
+  
+  for (int i = 0; i < numReadings; i++) {
+    int adcValue = analogRead(PH_PIN);
+    float voltage = adcValue * (VREF / ADC_RESOLUTION);
+    sum += voltage;
+    delay(10); // Small delay between readings
+  }
+  
+  float avgVoltage = sum / numReadings;
+  float phValue = slope * avgVoltage + intercept;
+  
+  // Clamp to reasonable pH range
+  if (phValue < 0) phValue = 0;
+  if (phValue > 14) phValue = 14;
+  
   return phValue;
 }
 
 float readWaterLevel() {
-  // Trigger ultrasonic sensor
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
+  // Take multiple readings and use median for better accuracy
+  const int numReadings = 5;
+  float readings[numReadings];
+  
+  for (int i = 0; i < numReadings; i++) {
+    // Trigger ultrasonic sensor
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
 
-  // Read echo
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distanceCm = duration * SOUND_SPEED / 2;
-  float distanceMm = distanceCm * 10;
-
+    // Read echo with timeout
+    long duration = pulseIn(ECHO_PIN, HIGH, 30000); // 30ms timeout (about 5m range)
+    
+    if (duration == 0) {
+      // No echo received, invalid reading
+      readings[i] = -1;
+    } else {
+      float distanceCm = duration * SOUND_SPEED / 2;
+      float distanceMm = distanceCm * 10;
+      readings[i] = distanceMm;
+    }
+    
+    delay(50); // Wait before next reading
+  }
+  
+  // Sort readings to find median (ignore invalid readings)
+  int validCount = 0;
+  float validReadings[numReadings];
+  for (int i = 0; i < numReadings; i++) {
+    if (readings[i] > 0) {
+      validReadings[validCount++] = readings[i];
+    }
+  }
+  
+  if (validCount == 0) return 0; // No valid readings
+  
+  // Simple sort for median
+  for (int i = 0; i < validCount - 1; i++) {
+    for (int j = i + 1; j < validCount; j++) {
+      if (validReadings[i] > validReadings[j]) {
+        float temp = validReadings[i];
+        validReadings[i] = validReadings[j];
+        validReadings[j] = temp;
+      }
+    }
+  }
+  
+  float medianDistance = validReadings[validCount / 2];
+  
   // Water level = tank height - distance to water surface
-  float waterLevel = TANK_HEIGHT - distanceMm;
+  float waterLevel = TANK_HEIGHT - medianDistance;
 
   // Clamp to valid range
   if (waterLevel < 0) waterLevel = 0;
