@@ -6,11 +6,6 @@ import PumpControl from '@/components/PumpControl';
 import WaterLevelIndicator from '@/components/WaterLevelIndicator';
 import PHLevelIndicator from '@/components/PHLevelIndicator';
 
-const ESP32_HOSTNAMES = [
-  'esp32-hydroponics.local',
-  'esp32-hydroponics',
-];
-
 export default function Dashboard() {
   const [waterLevel, setWaterLevel] = useState(0);
   const [phLevel, setPhLevel] = useState(0);
@@ -18,113 +13,28 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [esp32Url, setEsp32Url] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
 
-  // Discover ESP32 on the network
-  const discoverESP32 = async () => {
-    setIsScanning(true);
-    setError(null);
-
-    // Try mDNS hostnames first
-    for (const hostname of ESP32_HOSTNAMES) {
-      try {
-        const testUrl = `http://${hostname}:8080`;
-        const response = await fetchWithTimeout(`${testUrl}/sensor`, 2000);
-        if (response.ok) {
-          setEsp32Url(testUrl);
-          setIsScanning(false);
-          return testUrl;
-        }
-      } catch (err) {
-        // Continue to next hostname
-      }
-    }
-
-    // If mDNS fails, try common local IP ranges
-    const localIPs = await scanLocalNetwork();
-    for (const ip of localIPs) {
-      try {
-        const testUrl = `http://${ip}:8080`;
-        const response = await fetchWithTimeout(`${testUrl}/sensor`, 1000);
-        if (response.ok) {
-          setEsp32Url(testUrl);
-          setIsScanning(false);
-          return testUrl;
-        }
-      } catch (err) {
-        // Continue to next IP
-      }
-    }
-
-    setIsScanning(false);
-    setError('ESP32 not found on network. Please check connection.');
-    return null;
-  };
-
-  // Helper function for fetch with timeout
-  const fetchWithTimeout = async (url: string, timeout: number): Promise<Response> => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  };
-
-  // Scan local network for ESP32 (common router subnets)
-  const scanLocalNetwork = async (): Promise<string[]> => {
-    const ips: string[] = [];
-    // Get current network info (simplified approach)
-    // This will scan common local IP ranges
-    for (let i = 1; i <= 254; i++) {
-      ips.push(`192.168.1.${i}`);
-      ips.push(`192.168.0.${i}`);
-      ips.push(`10.0.0.${i}`);
-    }
-    return ips;
-  };
-
-  // Fetch real-time sensor data from ESP32
+  // Fetch real-time sensor data from API
   const fetchSensorData = async () => {
-    if (!esp32Url) {
-      await discoverESP32();
-      return;
-    }
-
     try {
-      const response = await fetch(`${esp32Url}/sensor`);
+      const response = await fetch('/api/sensor');
       if (!response.ok) throw new Error('Failed to fetch sensor data');
       const data = await response.json();
       setWaterLevel((data.water_level / 965) * 100); // Convert mm to %
       setPhLevel(data.ph);
       setPumpOn(data.pump_status);
-      setLastUpdate(new Date());
+      setLastUpdate(new Date(data.lastUpdate));
       setError(null);
     } catch (err) {
-      setError('Unable to connect to ESP32 - attempting to rediscover...');
+      setError('Unable to fetch sensor data from server');
       console.error('Error fetching sensor data:', err);
-      // Try to rediscover on error
-      setEsp32Url(null);
     }
   };
 
   // Handle pump control
   const handlePumpToggle = async (newStatus: boolean) => {
-    if (!esp32Url) {
-      const url = await discoverESP32();
-      if (!url) return;
-    }
-
     try {
-      const response = await fetch(`${esp32Url}/pump`, {
+      const response = await fetch('/api/pump', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pump_status: newStatus }),
