@@ -31,26 +31,54 @@ This guide will help you set up SMS notifications for your hydroponics monitorin
 2. Find your **hydrophonics** project
 3. Click on **"Settings"** tab
 4. Click **"Environment Variables"** in the left sidebar
-5. Add the following variables:
+5. Add the following variables one by one:
+
+### Required Variables:
 
 | Variable Name | Value | Description |
 |---------------|-------|-------------|
 | `SMS_API_KEY` | `your_semaphore_api_key_here` | Your API key from Semaphore |
-| `SMS_SENDER_ID` | `HYDROPONICS` | Custom sender name (optional) |
 | `SMS_RECIPIENT` | `+639123456789` | Your Philippine mobile number with country code |
+| `NEXT_PUBLIC_APP_URL` | `https://hydrophonics-mu.vercel.app` | Your Vercel app URL |
+
+### Optional Variables:
+
+| Variable Name | Value | Description |
+|---------------|-------|-------------|
+| `SMS_SENDER_ID` | `HYDROPONICS` | Custom sender name (optional) |
+
+### Step-by-Step Addition:
+
+1. Click **"Add New"** button
+2. **Name**: Enter `SMS_API_KEY`
+3. **Value**: Paste your Semaphore API key
+4. **Environment**: Select **"Production"** (and Preview if you want)
+5. Click **"Save"**
+
+6. Repeat for `SMS_RECIPIENT`:
+   - **Name**: `SMS_RECIPIENT`
+   - **Value**: `+639xxxxxxxxx` (your Philippine number)
+   - **Environment**: Production
+   - Click **"Save"**
+
+7. Repeat for `NEXT_PUBLIC_APP_URL`:
+   - **Name**: `NEXT_PUBLIC_APP_URL`
+   - **Value**: `https://hydrophonics-mu.vercel.app`
+   - **Environment**: Production
+   - Click **"Save"**
 
 ### Example Configuration:
 ```
 SMS_API_KEY = abc123def456ghi789jkl012
-SMS_SENDER_ID = HYDROPONICS
 SMS_RECIPIENT = +639171234567
+NEXT_PUBLIC_APP_URL = https://hydrophonics-mu.vercel.app
+SMS_SENDER_ID = HYDROPONICS  (optional)
 ```
 
-6. Click **"Save"** for each variable
-7. **Redeploy** your application:
+8. **Redeploy** your application:
    - Go to **"Deployments"** tab
    - Click **"Redeploy"** on the latest deployment
-   - Wait for deployment to complete
+   - Wait for deployment to complete (2-3 minutes)
 
 ## 📱 Step 4: Test SMS Notifications
 
