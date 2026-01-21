@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // SMS configuration - replace with your provider's details
 const SMS_CONFIG = {
   provider: 'semaphore', // Options: semaphore, twilio, chikka, etc.
-  apiKey: process.env.SMS_API_KEY || '',
+  apiKey: process.env.SMS_API_KEY || '4053442aa8469def5330e2789fe41a10',
   senderId: process.env.SMS_SENDER_ID || 'HYDROPONICS',
-  recipient: process.env.SMS_RECIPIENT || '', // Phone number to send alerts to
+  recipient: process.env.SMS_RECIPIENT || '+639943428659', // Phone number to send alerts to
 };
 
 interface SMSData {

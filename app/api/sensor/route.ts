@@ -106,7 +106,8 @@ async function checkAlerts(ph: number, waterLevel: number) {
 
 async function sendSMSAlert(message: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/sms`, {
+    // Send SMS alert
+    const smsResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/sms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -114,10 +115,26 @@ async function sendSMSAlert(message: string) {
       body: JSON.stringify({ message }),
     });
 
-    if (!response.ok) {
-      console.error('SMS API returned error:', response.status);
+    if (!smsResponse.ok) {
+      console.error('SMS API returned error:', smsResponse.status);
+    }
+
+    // Send email alert
+    const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        subject: 'Hydroponics System Alert',
+        message: message
+      }),
+    });
+
+    if (!emailResponse.ok) {
+      console.error('Email API returned error:', emailResponse.status);
     }
   } catch (error) {
-    console.error('Failed to send SMS alert:', error);
+    console.error('Failed to send alerts:', error);
   }
 }
