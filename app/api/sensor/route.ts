@@ -8,6 +8,18 @@ let latestSensorData: {
   lastUpdate: Date;
 } | null = null;
 
+// Alert thresholds
+const ALERT_THRESHOLDS = {
+  ph_low: 5.5,
+  ph_high: 7.5,
+  water_level_low: 20, // percentage
+  water_level_high: 90, // percentage
+};
+
+// Alert tracking to avoid spam
+let lastAlerts: { [key: string]: Date } = {};
+const ALERT_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown between same alerts
+
 export async function GET() {
   if (!latestSensorData) {
     return NextResponse.json({ error: 'No sensor data available' }, { status: 404 });
@@ -32,8 +44,73 @@ export async function POST(request: NextRequest) {
       lastUpdate: new Date(),
     };
 
+    // Check for alerts and send SMS if needed
+    await checkAlerts(data.ph, data.water_level);
+
     return NextResponse.json({ status: 'ok' });
   } catch (error) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+}
+
+async function checkAlerts(ph: number, waterLevel: number) {
+  const now = new Date();
+  const alerts: string[] = [];
+
+  // Check pH alerts
+  if (ph < ALERT_THRESHOLDS.ph_low) {
+    const alertKey = 'ph_low';
+    if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
+      alerts.push(`⚠️ ALERT: pH level too low! Current: ${ph.toFixed(2)} (below ${ALERT_THRESHOLDS.ph_low})`);
+      lastAlerts[alertKey] = now;
+    }
+  } else if (ph > ALERT_THRESHOLDS.ph_high) {
+    const alertKey = 'ph_high';
+    if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
+      alerts.push(`⚠️ ALERT: pH level too high! Current: ${ph.toFixed(2)} (above ${ALERT_THRESHOLDS.ph_high})`);
+      lastAlerts[alertKey] = now;
+    }
+  }
+
+  // Check water level alerts
+  if (waterLevel < ALERT_THRESHOLDS.water_level_low) {
+    const alertKey = 'water_low';
+    if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
+      alerts.push(`🚨 ALERT: Water level critically low! Current: ${waterLevel.toFixed(1)}% (below ${ALERT_THRESHOLDS.water_level_low}%)`);
+      lastAlerts[alertKey] = now;
+    }
+  } else if (waterLevel > ALERT_THRESHOLDS.water_level_high) {
+    const alertKey = 'water_high';
+    if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
+      alerts.push(`⚠️ ALERT: Water level too high! Current: ${waterLevel.toFixed(1)}% (above ${ALERT_THRESHOLDS.water_level_high}%)`);
+      lastAlerts[alertKey] = now;
+    }
+  }
+
+  // Send SMS for each alert
+  for (const message of alerts) {
+    try {
+      await sendSMSAlert(message);
+    } catch (error) {
+      console.error('Failed to send SMS alert:', error);
+    }
+  }
+}
+
+async function sendSMSAlert(message: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/sms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!response.ok) {
+      console.error('SMS API returned error:', response.status);
+    }
+  } catch (error) {
+    console.error('Failed to send SMS alert:', error);
   }
 }
