@@ -11,7 +11,8 @@ let latestSensorData: {
 // Alert thresholds
 const ALERT_THRESHOLDS = {
   ph_low: 5.0,
-  ph_high: 8.0,
+  ph_warning_high: 7.5, // Warning level
+  ph_high: 8.0, // Critical level
   water_level_low: 20, // percentage
   water_level_high: 90, // percentage
 };
@@ -64,10 +65,16 @@ async function checkAlerts(ph: number, waterLevel: number) {
       alerts.push(`⚠️ ALERT: pH level too low! Current: ${ph.toFixed(2)} (below ${ALERT_THRESHOLDS.ph_low}). Replace water and fertilizer.`);
       lastAlerts[alertKey] = now;
     }
+  } else if (ph >= ALERT_THRESHOLDS.ph_warning_high && ph <= ALERT_THRESHOLDS.ph_high) {
+    const alertKey = 'ph_warning_high';
+    if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
+      alerts.push(`⚠️ WARNING: pH level approaching high limit! Current: ${ph.toFixed(2)} (between ${ALERT_THRESHOLDS.ph_warning_high}-${ALERT_THRESHOLDS.ph_high}). Monitor closely.`);
+      lastAlerts[alertKey] = now;
+    }
   } else if (ph > ALERT_THRESHOLDS.ph_high) {
     const alertKey = 'ph_high';
     if (!lastAlerts[alertKey] || (now.getTime() - lastAlerts[alertKey].getTime()) > ALERT_COOLDOWN) {
-      alerts.push(`⚠️ ALERT: pH level too high! Current: ${ph.toFixed(2)} (above ${ALERT_THRESHOLDS.ph_high}). Replace water and fertilizer.`);
+      alerts.push(`🚨 ALERT: pH level critically high! Current: ${ph.toFixed(2)} (above ${ALERT_THRESHOLDS.ph_high}). Replace water and fertilizer immediately.`);
       lastAlerts[alertKey] = now;
     }
   }
