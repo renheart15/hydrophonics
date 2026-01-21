@@ -19,30 +19,36 @@ For Vercel deployment, we recommend transactional email services rather than dir
 
 ## 🔑 Step 2: Set Up Email Service Account
 
-### **Option A: Resend (Recommended)**
+### **⚠️ Important: Domain Requirements**
+Most email services require domain verification. You **cannot use free domains** like Gmail (@gmail.com), Outlook (@outlook.com), or Yahoo for sending emails. You need either:
+- A custom domain (e.g., yoursite.com) - requires domain purchase
+- Services that allow free domains for sending
 
-1. Go to [resend.com](https://resend.com)
-2. Sign up for a free account
-3. Verify your email
-4. Go to **API Keys** section
-5. Create a new API key
-6. Copy the API key
-
-### **Option B: SendGrid**
+### **Option A: SendGrid (Allows Free Domains)** ⭐ **Recommended**
 
 1. Go to [sendgrid.com](https://sendgrid.com)
 2. Sign up and verify your account
 3. Go to **Settings** > **API Keys**
 4. Create a new API key with **Full Access** permissions
 5. Copy the API key
+6. **No domain verification needed** - SendGrid allows sending from Gmail/Outlook addresses
 
-### **Option C: Mailgun**
+### **Option B: Mailgun (Requires Domain)**
 
 1. Go to [mailgun.com](https://mailgun.com)
-2. Sign up and verify your domain
+2. Sign up and verify your domain (purchase a domain first)
 3. Go to **Sending** > **Domains** to verify your domain
 4. Go to **API** > **API Keys**
 5. Copy the private API key
+
+### **Option C: Resend (Requires Domain)**
+
+1. Go to [resend.com](https://resend.com)
+2. Sign up for a free account
+3. **Purchase and verify a domain** (required - cannot use free domains)
+4. Go to **API Keys** section
+5. Create a new API key
+6. Copy the API key
 
 ## ⚙️ Step 3: Configure Vercel Environment Variables
 
