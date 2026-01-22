@@ -5,8 +5,9 @@
 const char* ssid = "GlobeAtHome_26B77_2.4";
 const char* password = "2258A607";
 
-// Server URL for sending emails
+// Server URLs
 const char* emailServerUrl = "https://hydrophonics-mu.vercel.app/api/sendEmail";
+const char* sensorServerUrl = "https://hydrophonics-mu.vercel.app/api/sensor";
 
 // Pin definitions
 #define PH_PIN 34
@@ -132,6 +133,9 @@ void sendSensorData() {
   Serial.print("pH: "); Serial.println(ph);
   Serial.print("Water: "); Serial.println(waterLevel);
 
+  // Send sensor data to server
+  sendSensorDataToServer(ph, waterLevel, pumpStatus);
+
   checkAndSendAlerts(ph, waterLevel);
 }
 
@@ -175,6 +179,29 @@ void checkAndSendAlerts(float ph, float waterLevel) {
     sendEmail(subject, message);
     lastEmailSent = millis();
   }
+}
+
+void sendSensorDataToServer(float ph, float waterLevel, bool pumpStatus) {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(sensorServerUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  String payload = "{";
+  payload += "\"ph\":" + String(ph, 2) + ",";
+  payload += "\"water_level\":" + String(waterLevel, 1) + ",";
+  payload += "\"pump_status\":" + String(pumpStatus ? "true" : "false");
+  payload += "}";
+
+  int code = http.POST(payload);
+  if (code == 200) {
+    Serial.println("Sensor data sent to server!");
+  } else {
+    Serial.println("Failed to send sensor data: " + String(code));
+  }
+
+  http.end();
 }
 
 void sendEmail(String subject, String body) {
