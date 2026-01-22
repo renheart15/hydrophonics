@@ -68,7 +68,7 @@ void loop() {
     lastSensorSend = millis();
   }
 
-  if (millis() - lastPumpCheck > 1000) {
+  if (millis() - lastPumpCheck > 2000) {
     checkPumpStatus();
     lastPumpCheck = millis();
   }

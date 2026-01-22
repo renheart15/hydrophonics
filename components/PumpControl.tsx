@@ -9,11 +9,17 @@ interface PumpControlProps {
 
 export default function PumpControl({ pumpOn, onToggle }: PumpControlProps) {
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleToggle = async () => {
+    setIsLoading(true);
     setIsAnimating(true);
-    await onToggle(!pumpOn);
-    setTimeout(() => setIsAnimating(false), 600);
+    try {
+      await onToggle(!pumpOn);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setIsAnimating(false), 600);
+    }
   };
 
   return (
@@ -44,13 +50,28 @@ export default function PumpControl({ pumpOn, onToggle }: PumpControlProps) {
           <button
             onClick={handleToggle}
             type="button"
-            className={`absolute inset-4 rounded-full font-bold text-sm md:text-lg flex items-center justify-center transition-all duration-500 transform cursor-pointer z-10 ${
+            className={`absolute inset-4 rounded-full font-bold text-sm md:text-base flex flex-col items-center justify-center transition-all duration-500 transform z-10 ${
+              isLoading || isAnimating
+                ? 'cursor-not-allowed opacity-75'
+                : 'cursor-pointer hover:scale-105 active:scale-95'
+            } ${
               pumpOn
-                ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-background shadow-lg shadow-cyan-500/50'
-                : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-300 shadow-lg shadow-gray-900/50'
-            } ${isAnimating ? 'scale-95' : 'hover:scale-105'}`}
+                ? 'bg-gradient-to-br from-emerald-400 to-green-500 text-white shadow-lg shadow-emerald-500/50'
+                : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-200 shadow-lg shadow-gray-900/50'
+            } ${isAnimating ? 'scale-95' : ''}`}
+            disabled={isLoading || isAnimating}
           >
-            {pumpOn ? '✓ ON' : '✕ OFF'}
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                <span className="text-xs md:text-sm font-medium mt-1">SENDING</span>
+              </>
+            ) : (
+              <>
+                <span className="text-lg md:text-xl">{pumpOn ? '⏸️' : '▶️'}</span>
+                <span className="text-xs md:text-sm font-medium mt-1">{pumpOn ? 'STOP' : 'START'}</span>
+              </>
+            )}
           </button>
 
           {/* Rotating pump icon */}
