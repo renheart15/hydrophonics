@@ -68,8 +68,8 @@ export default function PumpControl({ pumpOn, onToggle }: PumpControlProps) {
               </>
             ) : (
               <>
-                <span className="text-lg md:text-xl">{pumpOn ? '⏸️' : '▶️'}</span>
-                <span className="text-xs md:text-sm font-medium mt-1">{pumpOn ? 'OFF' : 'ON'}</span>
+                <span className="text-lg md:text-xl">{pumpOn ? '✓' : '✕'}</span>
+                <span className="text-xs md:text-sm font-medium mt-1">{pumpOn ? 'ON' : 'OFF'}</span>
               </>
             )}
           </button>
