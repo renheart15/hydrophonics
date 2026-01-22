@@ -8,6 +8,7 @@ const char* password = "2258A607";
 // Server URLs
 const char* emailServerUrl = "https://hydrophonics-mu.vercel.app/api/sendEmail";
 const char* sensorServerUrl = "https://hydrophonics-mu.vercel.app/api/sensor";
+const char* pumpServerUrl = "https://hydrophonics-mu.vercel.app/api/pump";
 
 // Pin definitions
 #define PH_PIN 34
@@ -140,14 +141,28 @@ void sendSensorData() {
 }
 
 void checkPumpStatus() {
-  // Automatic pump control
-  if (readWaterLevel() >= 200) {
-    digitalWrite(PUMP_RELAY_PIN, HIGH);
-    pumpStatus = true;
+  // Manual pump control - fetch status from server
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(pumpServerUrl);
+
+  int code = http.GET();
+  if (code == 200) {
+    String payload = http.getString();
+    // Parse JSON response - look for "pump_status":true or "pump_status":false
+    if (payload.indexOf("\"pump_status\":true") != -1) {
+      pumpStatus = true;
+    } else if (payload.indexOf("\"pump_status\":false") != -1) {
+      pumpStatus = false;
+    }
+    digitalWrite(PUMP_RELAY_PIN, pumpStatus ? HIGH : LOW);
+    Serial.println("Pump status updated: " + String(pumpStatus ? "ON" : "OFF"));
   } else {
-    digitalWrite(PUMP_RELAY_PIN, LOW);
-    pumpStatus = false;
+    Serial.println("Failed to fetch pump status: " + String(code));
   }
+
+  http.end();
 }
 
 void checkAndSendAlerts(float ph, float waterLevel) {
