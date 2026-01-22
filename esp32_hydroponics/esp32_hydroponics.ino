@@ -135,7 +135,7 @@ void sendSensorData() {
   Serial.print("Water: "); Serial.println(waterLevel);
 
   // Send sensor data to server
-  sendSensorDataToServer(ph, waterLevel, pumpStatus);
+  sendSensorDataToServer(ph, waterLevel);
 
   checkAndSendAlerts(ph, waterLevel);
 }
@@ -196,7 +196,7 @@ void checkAndSendAlerts(float ph, float waterLevel) {
   }
 }
 
-void sendSensorDataToServer(float ph, float waterLevel, bool pumpStatus) {
+void sendSensorDataToServer(float ph, float waterLevel) {
   if (WiFi.status() != WL_CONNECTED) return;
 
   HTTPClient http;
@@ -205,8 +205,7 @@ void sendSensorDataToServer(float ph, float waterLevel, bool pumpStatus) {
 
   String payload = "{";
   payload += "\"ph\":" + String(ph, 2) + ",";
-  payload += "\"water_level\":" + String(waterLevel, 1) + ",";
-  payload += "\"pump_status\":" + String(pumpStatus ? "true" : "false");
+  payload += "\"water_level\":" + String(waterLevel, 1);
   payload += "}";
 
   int code = http.POST(payload);

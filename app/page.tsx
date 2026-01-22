@@ -22,7 +22,6 @@ export default function Dashboard() {
       const data = await response.json();
       setWaterLevel((data.water_level / 965) * 100); // Convert mm to %
       setPhLevel(data.ph);
-      setPumpOn(data.pump_status);
       setLastUpdate(new Date(data.lastUpdate));
       setError(null);
     } catch (err) {
