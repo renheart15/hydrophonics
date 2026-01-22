@@ -1,54 +1,25 @@
 # Email Notifications Setup Guide
 
-This guide will help you set up email notifications for your hydroponics monitoring system using SMTP-compatible email services.
+This guide will help you set up email notifications for your hydroponics monitoring system using SMTP.
 
 ## 📋 Prerequisites
 
 - Vercel account (where your app is deployed)
-- Email account (Gmail, Outlook, etc.)
+- Email account (Gmail, Outlook, etc.) with app password
 - Internet connection
 
-## 🚀 Step 1: Choose an Email Service
+## 🚀 Step 2: Set Up SMTP Email Account
 
-For Vercel deployment, we recommend transactional email services rather than direct SMTP:
+For Gmail:
+1. Go to your Google Account settings
+2. Enable 2-Factor Authentication
+3. Go to **Security** > **App passwords**
+4. Generate an app password for "Hydroponics Monitor"
+5. Copy the 16-character password
 
-### **Recommended Services:**
-1. **Resend** (Easiest setup, great free tier)
-2. **SendGrid** (Popular, reliable)
-3. **Mailgun** (Good for bulk emails)
-
-## 🔑 Step 2: Set Up Email Service Account
-
-### **⚠️ Important: Domain Requirements**
-Most email services require domain verification. You **cannot use free domains** like Gmail (@gmail.com), Outlook (@outlook.com), or Yahoo for sending emails. You need either:
-- A custom domain (e.g., yoursite.com) - requires domain purchase
-- Services that allow free domains for sending
-
-### **Option A: SendGrid (Allows Free Domains)** ⭐ **Recommended**
-
-1. Go to [sendgrid.com](https://sendgrid.com)
-2. Sign up and verify your account
-3. Go to **Settings** > **API Keys**
-4. Create a new API key with **Full Access** permissions
-5. Copy the API key
-6. **No domain verification needed** - SendGrid allows sending from Gmail/Outlook addresses
-
-### **Option B: Mailgun (Requires Domain)**
-
-1. Go to [mailgun.com](https://mailgun.com)
-2. Sign up and verify your domain (purchase a domain first)
-3. Go to **Sending** > **Domains** to verify your domain
-4. Go to **API** > **API Keys**
-5. Copy the private API key
-
-### **Option C: Resend (Requires Domain)**
-
-1. Go to [resend.com](https://resend.com)
-2. Sign up for a free account
-3. **Purchase and verify a domain** (required - cannot use free domains)
-4. Go to **API Keys** section
-5. Create a new API key
-6. Copy the API key
+For Outlook/Hotmail:
+1. Go to account settings
+2. Enable app passwords if available, or use your regular password
 
 ## ⚙️ Step 3: Configure Vercel Environment Variables
 
@@ -57,65 +28,52 @@ Most email services require domain verification. You **cannot use free domains**
 3. Click **"Settings"** tab
 4. Click **"Environment Variables"**
 
-### **For Resend:**
+Add these environment variables:
+
 ```
-RESEND_API_KEY = re_xxxxxxxxxxxxxxxxxxxxxxxxx
-FROM_EMAIL = your-verified-email@yourdomain.com
+SMTP_HOST = smtp.gmail.com
+SMTP_PORT = 587
+SMTP_SECURE = false
+SMTP_USER = your-email@gmail.com
+SMTP_PASS = fdusizdkbckidzuy
+FROM_EMAIL = your-email@gmail.com
 FROM_NAME = Hydroponics Monitor
-TO_EMAIL = your-email@example.com
-EMAIL_SERVICE = resend
+TO_EMAIL = recipient@example.com
 NEXT_PUBLIC_APP_URL = https://hydrophonics-mu.vercel.app
 ```
 
-### **For SendGrid:**
-```
-SENDGRID_API_KEY = SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-FROM_EMAIL = your-verified-email@yourdomain.com
-FROM_NAME = Hydroponics Monitor
-TO_EMAIL = your-email@example.com
-EMAIL_SERVICE = sendgrid
-NEXT_PUBLIC_APP_URL = https://hydrophonics-mu.vercel.app
-```
+## 📧 Step 4: Test SMTP Connection
 
-### **For Mailgun:**
-```
-MAILGUN_API_KEY = key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-MAILGUN_DOMAIN = yourdomain.com
-FROM_EMAIL = alerts@yourdomain.com
-FROM_NAME = Hydroponics Monitor
-TO_EMAIL = your-email@example.com
-EMAIL_SERVICE = mailgun
-NEXT_PUBLIC_APP_URL = https://hydrophonics-mu.vercel.app
-```
+Test your SMTP settings by sending a test email. Make sure:
+- Your email account allows SMTP connections
+- App password is correct (for Gmail)
+- SMTP server settings match your provider
 
-## 📧 Step 4: Verify Domain (If Required)
+## 📱 Step 4: Configure ESP32 Email Settings
 
-### **Resend:**
-- Add and verify your domain in the Resend dashboard
-- Or use their shared domain initially
+Update the ESP32 code with your Gmail credentials:
 
-### **SendGrid:**
-- Single sender verification required
-- Go to **Settings** > **Sender Authentication**
-- Verify your email address
-
-### **Mailgun:**
-- Domain verification required
-- Add DNS records as instructed
-
-## 📱 Step 5: Test Email Notifications
-
-### Method 1: Manual Test
-```bash
-curl -X POST https://hydrophonics-mu.vercel.app/api/email \
-  -H "Content-Type: application/json" \
-  -d '{"subject": "Test Alert", "message": "This is a test email from your hydroponics system"}'
+```cpp
+// Gmail SMTP settings
+const char* smtpServer = "smtp.gmail.com";
+const int smtpPort = 587;
+const char* smtpUser = "your-email@gmail.com"; // Replace with your Gmail
+const char* smtpPass = "your-app-password"; // Replace with 16-char app password
+const char* fromEmail = "your-email@gmail.com"; // Replace with your Gmail
+const char* toEmail = "recipient@example.com"; // Replace with recipient email
 ```
 
-### Method 2: Trigger Real Alerts
-Upload the ESP32 code and let the system run. Emails will be sent automatically when:
-- pH drops below 5.0 or rises above 7.5
-- Water level drops below 20%
+## 📧 Step 5: Upload ESP32 Code
+
+Upload the updated ESP32 code to your board. The ESP32 will now:
+
+- Send sensor data to your web dashboard every 3 seconds
+- Monitor pH and water levels for alerts
+- Send HTTP requests to your Vercel server when alerts are triggered:
+  - pH drops below 5.0 or rises above 7.5
+  - Water level drops below 20% (200mm)
+- Your Vercel server handles the actual Gmail SMTP sending
+- Prevent email spam with 5-minute cooldown between alerts
 
 ## 📨 Step 6: Verify Email Delivery
 
@@ -130,28 +88,34 @@ Upload the ESP32 code and let the system run. Emails will be sent automatically 
 ## 🔧 Troubleshooting
 
 ### Email Not Received
-- **Check API Key**: Ensure the API key is correct and active
-- **Verify Sender**: Make sure FROM_EMAIL is verified in your email service
-- **Check Quotas**: Some services have sending limits for free accounts
-- **Domain Verification**: Ensure domain is properly verified
+- **Check SMTP Credentials**: Ensure SMTP_USER and SMTP_PASS are correct
+- **App Password**: For Gmail, use app password, not regular password
+- **SMTP Settings**: Verify SMTP_HOST, SMTP_PORT, and SMTP_SECURE are correct
+- **Firewall**: Some networks block SMTP ports
 
 ### Vercel Issues
 - **Redeploy**: Always redeploy after adding environment variables
-- **Logs**: Check Vercel function logs for API errors
-- **Rate Limits**: Email services may have rate limits
+- **Logs**: Check Vercel function logs for SMTP connection errors
+- **Rate Limits**: Email providers may rate limit SMTP connections
 
-### API Errors
-- **401 Unauthorized**: Check API key validity
-- **403 Forbidden**: Verify domain/sender authentication
-- **429 Too Many Requests**: Service rate limiting
+### SMTP Connection Errors
+- **Authentication Failed**: Check username/password
+- **Connection Timeout**: Verify SMTP server and port
+- **TLS/SSL Issues**: Check SMTP_SECURE setting
 
-## 📊 Pricing Comparison
+## 📊 SMTP Provider Information
 
-| Service | Free Tier | Cost | Best For |
-|---------|-----------|------|----------|
-| **Resend** | 3,000 emails/month | $0-20/month | Beginners |
-| **SendGrid** | 100 emails/day | $0-89/month | Small businesses |
-| **Mailgun** | 5,000 emails/month | $0-35/month | Developers |
+### Gmail SMTP
+- **Server**: smtp.gmail.com
+- **Port**: 587 (TLS) or 465 (SSL)
+- **Security**: Required (2FA + App Password)
+- **Limits**: 500 emails/day
+
+### Outlook/Hotmail SMTP
+- **Server**: smtp-mail.outlook.com
+- **Port**: 587
+- **Security**: STARTTLS required
+- **Limits**: Varies by account type
 
 ## 🎯 Next Steps
 

@@ -3,27 +3,26 @@ import nodemailer from 'nodemailer';
 
 interface EmailData {
   subject: string;
-  message: string;
-  to?: string;
+  body: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const data: EmailData = await request.json();
 
-    if (!data.subject || !data.message) {
-      return NextResponse.json({ error: 'Subject and message are required' }, { status: 400 });
+    if (!data.subject || !data.body) {
+      return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 });
     }
 
-    const toEmail = data.to || process.env.TO_EMAIL;
+    const toEmail = process.env.TO_EMAIL;
     if (!toEmail) {
       return NextResponse.json({ error: 'Recipient email is required' }, { status: 400 });
     }
 
     const fromEmail = process.env.FROM_EMAIL || 'noreply@hydroponics-monitor.com';
-    const fromName = process.env.FROM_NAME || 'Hydroponics Monitor';
+    const fromName = process.env.FROM_NAME || 'Hydrophonics';
 
-    const { success, errorMessage } = await sendSMTPEmail(data.subject, data.message, toEmail as string, fromEmail as string, fromName as string);
+    const { success, errorMessage } = await sendSMTPEmail(data.subject, data.body, toEmail, fromEmail, fromName);
 
     if (!success) {
       return NextResponse.json({ error: errorMessage || 'Failed to send email' }, { status: 500 });

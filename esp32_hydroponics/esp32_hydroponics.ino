@@ -2,11 +2,11 @@
 #include <HTTPClient.h>
 
 // WiFi credentials
-const char* ssid = "GlobeAtHome_26B77_2.4"; // Replace with your WiFi SSID
-const char* password = "2258A607"; // Replace with your WiFi password
+const char* ssid = "GlobeAtHome_26B77_2.4";
+const char* password = "2258A607";
 
-// Server URL for deployed app
-const char* serverUrl = "https://hydrophonics-mu.vercel.app";
+// Server URL for sending emails
+const char* emailServerUrl = "https://hydrophonics-mu.vercel.app/api/sendEmail";
 
 // Pin definitions
 #define PH_PIN 34
@@ -20,7 +20,7 @@ const char* serverUrl = "https://hydrophonics-mu.vercel.app";
 #define SOUND_SPEED 0.034 // cm/us
 #define TANK_HEIGHT 965 // mm
 
-// pH calibration (from your formula)
+// pH calibration
 float voltage1 = 1.096; // Voltage at pH 6.86
 float pH1 = 6.86;
 float voltage2 = 0.884; // Voltage at pH 4.01
@@ -33,178 +33,165 @@ bool pumpStatus = false;
 unsigned long lastSensorSend = 0;
 unsigned long lastPumpCheck = 0;
 
+// Alert tracking variables
+bool phLowAlertSent = false;
+bool phHighAlertSent = false;
+bool waterLowAlertSent = false;
+unsigned long lastEmailSent = 0;
+const unsigned long EMAIL_COOLDOWN = 300000; // 5 min
+
 void setup() {
   Serial.begin(115200);
 
-  // Calculate pH calibration
   slope = (pH2 - pH1) / (voltage2 - voltage1);
   intercept = pH1 - slope * voltage1;
 
-  // Pin modes
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   pinMode(PUMP_RELAY_PIN, OUTPUT);
-  digitalWrite(PUMP_RELAY_PIN, LOW); // Pump off initially
+  digitalWrite(PUMP_RELAY_PIN, LOW);
 
-  // Connect to WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
-  Serial.print("Connected to WiFi. IP: ");
-  Serial.println(WiFi.localIP());
+  Serial.println("\nWiFi connected!");
 }
 
 void loop() {
-  // Send sensor data to server every 3 seconds
   if (millis() - lastSensorSend > 3000) {
     sendSensorData();
     lastSensorSend = millis();
   }
 
-  // Check pump status from server every 1 second
   if (millis() - lastPumpCheck > 1000) {
     checkPumpStatus();
     lastPumpCheck = millis();
   }
 }
 
-
-
 float readPH() {
-  // Take multiple readings and average for better accuracy
   const int numReadings = 10;
   float sum = 0;
-  
   for (int i = 0; i < numReadings; i++) {
-    int adcValue = analogRead(PH_PIN);
-    float voltage = adcValue * (VREF / ADC_RESOLUTION);
+    int adc = analogRead(PH_PIN);
+    float voltage = adc * (VREF / ADC_RESOLUTION);
     sum += voltage;
-    delay(10); // Small delay between readings
+    delay(10);
   }
-  
   float avgVoltage = sum / numReadings;
   float phValue = slope * avgVoltage + intercept;
-  
-  // Clamp to reasonable pH range
-  if (phValue < 0) phValue = 0;
-  if (phValue > 14) phValue = 14;
-  
-  return phValue;
+  return constrain(phValue, 0, 14);
 }
 
 float readWaterLevel() {
-  // Take multiple readings and use median for better accuracy
   const int numReadings = 5;
   float readings[numReadings];
-  
+
   for (int i = 0; i < numReadings; i++) {
-    // Trigger ultrasonic sensor
     digitalWrite(TRIG_PIN, LOW);
     delayMicroseconds(2);
     digitalWrite(TRIG_PIN, HIGH);
     delayMicroseconds(10);
     digitalWrite(TRIG_PIN, LOW);
 
-    // Read echo with timeout
-    long duration = pulseIn(ECHO_PIN, HIGH, 30000); // 30ms timeout (about 5m range)
-    
-    if (duration == 0) {
-      // No echo received, invalid reading
-      readings[i] = -1;
-    } else {
-      float distanceCm = duration * SOUND_SPEED / 2;
-      float distanceMm = distanceCm * 10;
-      readings[i] = distanceMm;
-    }
-    
-    delay(50); // Wait before next reading
+    long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+    readings[i] = (duration == 0) ? -1 : (duration * SOUND_SPEED / 2) * 10;
+    delay(50);
   }
-  
-  // Sort readings to find median (ignore invalid readings)
+
   int validCount = 0;
   float validReadings[numReadings];
-  for (int i = 0; i < numReadings; i++) {
-    if (readings[i] > 0) {
-      validReadings[validCount++] = readings[i];
-    }
-  }
-  
-  if (validCount == 0) return 0; // No valid readings
-  
-  // Simple sort for median
-  for (int i = 0; i < validCount - 1; i++) {
-    for (int j = i + 1; j < validCount; j++) {
+  for (int i = 0; i < numReadings; i++)
+    if (readings[i] > 0) validReadings[validCount++] = readings[i];
+
+  if (validCount == 0) return 0;
+
+  // simple sort
+  for (int i = 0; i < validCount - 1; i++)
+    for (int j = i + 1; j < validCount; j++)
       if (validReadings[i] > validReadings[j]) {
         float temp = validReadings[i];
         validReadings[i] = validReadings[j];
         validReadings[j] = temp;
       }
-    }
-  }
-  
+
   float medianDistance = validReadings[validCount / 2];
-  
-  // Water level = tank height - distance to water surface
   float waterLevel = TANK_HEIGHT - medianDistance;
-
-  // Clamp to valid range
-  if (waterLevel < 0) waterLevel = 0;
-  if (waterLevel > TANK_HEIGHT) waterLevel = TANK_HEIGHT;
-
-  return waterLevel;
+  return constrain(waterLevel, 0, TANK_HEIGHT);
 }
 
 void sendSensorData() {
   if (WiFi.status() != WL_CONNECTED) return;
 
-  HTTPClient http;
-  http.begin(String(serverUrl) + "/api/sensor");
-  http.addHeader("Content-Type", "application/json");
-
   float ph = readPH();
   float waterLevel = readWaterLevel();
 
-  String jsonData = "{";
-  jsonData += "\"ph\":" + String(ph, 2) + ",";
-  jsonData += "\"water_level\":" + String(waterLevel, 0) + ",";
-  jsonData += "\"pump_status\":" + String(pumpStatus ? "true" : "false");
-  jsonData += "}";
+  Serial.print("pH: "); Serial.println(ph);
+  Serial.print("Water: "); Serial.println(waterLevel);
 
-  int httpResponseCode = http.POST(jsonData);
-
-  if (httpResponseCode > 0) {
-    Serial.println("Sensor data sent successfully");
-  } else {
-    Serial.println("Error sending sensor data: " + String(httpResponseCode));
-  }
-
-  http.end();
+  checkAndSendAlerts(ph, waterLevel);
 }
 
 void checkPumpStatus() {
+  // Automatic pump control
+  if (readWaterLevel() >= 200) {
+    digitalWrite(PUMP_RELAY_PIN, HIGH);
+    pumpStatus = true;
+  } else {
+    digitalWrite(PUMP_RELAY_PIN, LOW);
+    pumpStatus = false;
+  }
+}
+
+void checkAndSendAlerts(float ph, float waterLevel) {
+  if (millis() - lastEmailSent < EMAIL_COOLDOWN) return;
+
+  bool alertTriggered = false;
+  String subject = "Hydroponics System Alert";
+  String message = "";
+
+  if (ph < 5.0 && !phLowAlertSent) {
+    message += "⚠️ pH too low: " + String(ph) + "\n";
+    phLowAlertSent = true; phHighAlertSent = false;
+    alertTriggered = true;
+  } else if (ph > 7.5 && !phHighAlertSent) {
+    message += "⚠️ pH too high: " + String(ph) + "\n";
+    phHighAlertSent = true; phLowAlertSent = false;
+    alertTriggered = true;
+  } else if (ph >= 5.0 && ph <= 7.5) {
+    phLowAlertSent = false; phHighAlertSent = false;
+  }
+
+  if (waterLevel < 200 && !waterLowAlertSent) {
+    message += "⚠️ Water low: " + String(waterLevel) + "mm\n";
+    waterLowAlertSent = true;
+    alertTriggered = true;
+  } else if (waterLevel >= 200) waterLowAlertSent = false;
+
+  if (alertTriggered) {
+    sendEmail(subject, message);
+    lastEmailSent = millis();
+  }
+}
+
+void sendEmail(String subject, String body) {
   if (WiFi.status() != WL_CONNECTED) return;
 
   HTTPClient http;
-  http.begin(String(serverUrl) + "/api/pump");
+  http.begin(emailServerUrl);
+  http.addHeader("Content-Type", "application/json");
 
-  int httpResponseCode = http.GET();
+  String payload = "{";
+  payload += "\"subject\":\"" + subject + "\",";
+  payload += "\"body\":\"" + body + "\"";
+  payload += "}";
 
-  if (httpResponseCode > 0) {
-    String payload = http.getString();
-    // Simple JSON parsing
-    bool newStatus = payload.indexOf("true") != -1;
-    if (newStatus != pumpStatus) {
-      pumpStatus = newStatus;
-      digitalWrite(PUMP_RELAY_PIN, pumpStatus ? HIGH : LOW);
-      Serial.println("Pump status updated to: " + String(pumpStatus ? "ON" : "OFF"));
-    }
-  } else {
-    Serial.println("Error checking pump status: " + String(httpResponseCode));
-  }
+  int code = http.POST(payload);
+  if (code > 0) Serial.println("Email triggered via server!");
+  else Serial.println("Failed to trigger email: " + String(code));
 
   http.end();
 }
