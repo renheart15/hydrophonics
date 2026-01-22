@@ -34,6 +34,7 @@ float intercept;
 bool pumpStatus = false;
 unsigned long lastSensorSend = 0;
 unsigned long lastPumpCheck = 0;
+const unsigned long PUMP_CHECK_INTERVAL = 5000; // Check pump status every 5 seconds
 
 // Alert tracking variables
 bool phLowAlertSent = false;
@@ -68,7 +69,7 @@ void loop() {
     lastSensorSend = millis();
   }
 
-  if (millis() - lastPumpCheck > 1000) {
+  if (millis() - lastPumpCheck > PUMP_CHECK_INTERVAL) {
     checkPumpStatus();
     lastPumpCheck = millis();
   }
@@ -142,10 +143,14 @@ void sendSensorData() {
 
 void checkPumpStatus() {
   // Manual pump control - fetch status from server
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, skipping pump status check");
+    return;
+  }
 
   HTTPClient http;
   http.begin(pumpServerUrl);
+  http.setTimeout(5000); // 5 second timeout
 
   int code = http.GET();
   if (code == 200) {
@@ -159,7 +164,7 @@ void checkPumpStatus() {
     digitalWrite(PUMP_RELAY_PIN, pumpStatus ? HIGH : LOW);
     Serial.println("Pump status updated: " + String(pumpStatus ? "ON" : "OFF"));
   } else {
-    Serial.println("Failed to fetch pump status: " + String(code));
+    Serial.println("Failed to fetch pump status: HTTP " + String(code));
   }
 
   http.end();
@@ -197,11 +202,15 @@ void checkAndSendAlerts(float ph, float waterLevel) {
 }
 
 void sendSensorDataToServer(float ph, float waterLevel, bool pumpStatus) {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, skipping sensor data send");
+    return;
+  }
 
   HTTPClient http;
   http.begin(sensorServerUrl);
   http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000); // 5 second timeout
 
   String payload = "{";
   payload += "\"ph\":" + String(ph, 2) + ",";
@@ -213,18 +222,22 @@ void sendSensorDataToServer(float ph, float waterLevel, bool pumpStatus) {
   if (code == 200) {
     Serial.println("Sensor data sent to server!");
   } else {
-    Serial.println("Failed to send sensor data: " + String(code));
+    Serial.println("Failed to send sensor data: HTTP " + String(code));
   }
 
   http.end();
 }
 
 void sendEmail(String subject, String body) {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, skipping email send");
+    return;
+  }
 
   HTTPClient http;
   http.begin(emailServerUrl);
   http.addHeader("Content-Type", "application/json");
+  http.setTimeout(10000); // 10 second timeout for email (longer as it may involve SMTP)
 
   String payload = "{";
   payload += "\"subject\":\"" + subject + "\",";
@@ -232,8 +245,11 @@ void sendEmail(String subject, String body) {
   payload += "}";
 
   int code = http.POST(payload);
-  if (code > 0) Serial.println("Email triggered via server!");
-  else Serial.println("Failed to trigger email: " + String(code));
+  if (code > 0) {
+    Serial.println("Email triggered via server!");
+  } else {
+    Serial.println("Failed to trigger email: HTTP " + String(code));
+  }
 
   http.end();
 }

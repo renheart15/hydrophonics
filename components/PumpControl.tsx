@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 interface PumpControlProps {
   pumpOn: boolean;
@@ -9,12 +9,28 @@ interface PumpControlProps {
 
 export default function PumpControl({ pumpOn, onToggle }: PumpControlProps) {
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastClickTime, setLastClickTime] = useState(0);
 
-  const handleToggle = async () => {
+  const handleToggle = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastClickTime < 1000) return; // Debounce 1 second
+
+    setLastClickTime(now);
+    setIsLoading(true);
     setIsAnimating(true);
-    await onToggle(!pumpOn);
-    setTimeout(() => setIsAnimating(false), 600);
-  };
+
+    try {
+      await onToggle(!pumpOn);
+    } catch (error) {
+      console.error('Failed to toggle pump:', error);
+    } finally {
+      setTimeout(() => {
+        setIsAnimating(false);
+        setIsLoading(false);
+      }, 600);
+    }
+  }, [pumpOn, onToggle, lastClickTime]);
 
   return (
     <div className="glass-effect rounded-xl p-6 md:p-12 backdrop-blur border border-white/10 w-full max-w-md">
@@ -43,14 +59,23 @@ export default function PumpControl({ pumpOn, onToggle }: PumpControlProps) {
           {/* Center pump button */}
           <button
             onClick={handleToggle}
+            disabled={isLoading}
             type="button"
-            className={`absolute inset-4 rounded-full font-bold text-sm md:text-lg flex items-center justify-center transition-all duration-500 transform cursor-pointer z-10 ${
+            className={`absolute inset-4 rounded-full font-bold text-sm md:text-lg flex items-center justify-center transition-all duration-500 transform z-10 ${
               pumpOn
                 ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-background shadow-lg shadow-cyan-500/50'
                 : 'bg-gradient-to-br from-gray-600 to-gray-700 text-gray-300 shadow-lg shadow-gray-900/50'
-            } ${isAnimating ? 'scale-95' : 'hover:scale-105'}`}
+            } ${
+              isLoading
+                ? 'cursor-not-allowed opacity-75'
+                : 'cursor-pointer hover:scale-105'
+            } ${isAnimating && !isLoading ? 'scale-95' : ''}`}
           >
-            {pumpOn ? '✓ ON' : '✕ OFF'}
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            ) : (
+              pumpOn ? '✓ ON' : '✕ OFF'
+            )}
           </button>
 
           {/* Rotating pump icon */}
